@@ -1,0 +1,17 @@
+# Основные компоненты LangChain
+langchain
+langchain-openai
+
+# Векторная база данных
+chromadb
+
+# Для загрузки переменных окружения (хотя мы используем config.py, это хорошая практика)
+python-dotenv
+
+# Для загрузки и обработки документов в формате Markdown
+unstructured
+markdown
+
+# FastAPI
+fastapi
+uvicorn
