@@ -52,6 +52,7 @@ tasks = {}
 class CharacterData(BaseModel):
     character_data: dict
     vk_id: int = 0
+    admin_id: str = None
 
 def process_validation(task_id: str, character_data: dict):
     logger.info(f"Starting validation for task {task_id}")
@@ -70,17 +71,18 @@ async def start_validation(
     db: Connection = Depends(get_db)
 ):
     # Check rate limit
-    cursor = db.execute(
-        "SELECT last_request FROM ai_requests WHERE vk_id = ?",
-        (data.vk_id,)
-    )
-    result = cursor.fetchone()
-    
-    if result and datetime.now() - datetime.fromisoformat(result[0]) < timedelta(hours=3):
-        raise HTTPException(
-            status_code=429,
-            detail="You can only make one request every 3 hours"
+    if not data.admin_id:
+        cursor = db.execute(
+            "SELECT last_request FROM ai_requests WHERE vk_id = ?",
+            (data.vk_id,)
         )
+        result = cursor.fetchone()
+        
+        if result and datetime.now() - datetime.fromisoformat(result[0]) < timedelta(hours=3):
+            raise HTTPException(
+                status_code=429,
+                detail="You can only make one request every 3 hours"
+            )
 
     task_id = str(uuid.uuid4())
     tasks[task_id] = {"status": "processing"}
