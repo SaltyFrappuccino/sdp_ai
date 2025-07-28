@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.concurrency import run_in_threadpool
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from sdp_ai_assistant import Assistant
 from sqlite3 import Connection
 import sqlite3
 import config
+import uuid
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -42,16 +43,29 @@ def get_db():
 # Initialize AI assistant
 assistant = Assistant(config.MODEL_LIST[1])  # Используем gemini-2.5-flash
 
-@app.post("/")
-async def validate_character(
-    character_data: dict,
-    vk_id: int = 0, # Добавляем значение по умолчанию
+tasks = {}
+
+class CharacterData(BaseModel):
+    character_data: dict
+    vk_id: int = 0
+
+def process_validation(task_id: str, character_data: dict):
+    try:
+        result = assistant.validate_character_sheet(character_data)
+        tasks[task_id] = {"status": "completed", "result": result}
+    except Exception as e:
+        tasks[task_id] = {"status": "error", "detail": str(e)}
+
+@app.post("/validate")
+async def start_validation(
+    data: CharacterData,
+    background_tasks: BackgroundTasks,
     db: Connection = Depends(get_db)
 ):
     # Check rate limit
     cursor = db.execute(
         "SELECT last_request FROM ai_requests WHERE vk_id = ?",
-        (vk_id,)
+        (data.vk_id,)
     )
     result = cursor.fetchone()
     
@@ -61,17 +75,26 @@ async def validate_character(
             detail="You can only make one request every 3 hours"
         )
 
-    # Validate character sheet
-    validation_result = await run_in_threadpool(assistant.validate_character_sheet, character_data)
+    task_id = str(uuid.uuid4())
+    tasks[task_id] = {"status": "processing"}
+    
+    background_tasks.add_task(process_validation, task_id, data.character_data)
     
     # Update request timestamp
     db.execute(
         "INSERT OR REPLACE INTO ai_requests (vk_id, last_request) VALUES (?, ?)",
-        (vk_id, datetime.now().isoformat())
+        (data.vk_id, datetime.now().isoformat())
     )
     db.commit()
 
-    return {"result": validation_result}
+    return {"task_id": task_id}
+
+@app.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    task = tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 if __name__ == "__main__":
     import uvicorn
