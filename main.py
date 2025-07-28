@@ -9,9 +9,16 @@ import config
 app = FastAPI()
 
 # CORS configuration
+origins = [
+    "https://sdp-ten-sand.vercel.app",
+    r"https:\/\/prod-app53964840-.*\.pages-ac\.vk-apps\.com", 
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
+    allow_origin_regex=r"https:\/\/prod-app53964840-.*\.pages-ac\.vk-apps\.com",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
