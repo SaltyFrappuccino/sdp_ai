@@ -6,9 +6,13 @@ from sqlite3 import Connection
 import sqlite3
 import config
 import uuid
+import logging
 from pydantic import BaseModel
 
 app = FastAPI()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # CORS configuration
 origins = [
@@ -50,11 +54,14 @@ class CharacterData(BaseModel):
     vk_id: int = 0
 
 def process_validation(task_id: str, character_data: dict):
+    logger.info(f"Starting validation for task {task_id}")
     try:
         result = assistant.validate_character_sheet(character_data)
         tasks[task_id] = {"status": "completed", "result": result}
+        logger.info(f"Validation for task {task_id} completed successfully")
     except Exception as e:
         tasks[task_id] = {"status": "error", "detail": str(e)}
+        logger.error(f"Validation for task {task_id} failed: {e}")
 
 @app.post("/validate")
 async def start_validation(
