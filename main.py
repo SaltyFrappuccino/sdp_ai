@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from sdp_ai_assistant import Assistant
@@ -61,7 +62,7 @@ async def validate_character(
         )
 
     # Validate character sheet
-    validation_result = assistant.validate_character_sheet(character_data)
+    validation_result = await run_in_threadpool(assistant.validate_character_sheet, character_data)
     
     # Update request timestamp
     db.execute(
