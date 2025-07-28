@@ -26,7 +26,7 @@ app.add_middleware(
 
 # Database setup for rate limiting
 def get_db():
-    conn = sqlite3.connect('db/ai_requests.db')
+    conn = sqlite3.connect('db/ai_requests.db', check_same_thread=False)
     try:
         yield conn
     finally:
