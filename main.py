@@ -11,7 +11,8 @@ app = FastAPI()
 # CORS configuration
 origins = [
     "https://sdp-ten-sand.vercel.app",
-    r"https:\/\/prod-app53964840-.*\.pages-ac\.vk-apps\.com", 
+    "http://localhost:5173",
+    r"https:\/\/prod-app53964840-.*\.pages-ac\.vk-apps\.com",
 ]
 
 app.add_middleware(
@@ -25,7 +26,7 @@ app.add_middleware(
 
 # Database setup for rate limiting
 def get_db():
-    conn = sqlite3.connect('sdp_ai/db/ai_requests.db')
+    conn = sqlite3.connect('db/ai_requests.db')
     try:
         yield conn
     finally:
@@ -34,10 +35,10 @@ def get_db():
 # Initialize AI assistant
 assistant = Assistant(config.MODEL_LIST[1])  # Используем gemini-2.5-flash
 
-@app.post("/api/ai/validate")
+@app.post("/")
 async def validate_character(
     character_data: dict,
-    vk_id: int,
+    vk_id: int = 0, # Добавляем значение по умолчанию
     db: Connection = Depends(get_db)
 ):
     # Check rate limit
