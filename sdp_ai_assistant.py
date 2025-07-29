@@ -158,32 +158,27 @@ class Assistant:
         """
         self.idea_prompt = ChatPromptTemplate.from_template(idea_template)
 
-        contract_idea_template = """
-        Ты — креативный Гейм-Мастер (ГМ), специализирующийся на создании уникальных контрактов и способностей.
-        Твоя задача — помочь игроку, додумав за него концепцию контракта на основе его запроса и уже заполненных данных.
+        # Промпт для генерации креативной идеи (Шаг 1)
+        creative_idea_template = """
+        Ты — креативный Гейм-Мастер (ГМ). Твоя задача — придумать идею для контракта.
+        Проанализируй анкету и запрос игрока. Напиши в свободной форме описание контракта, существа и 2-3 способностей.
+        Не используй JSON. Просто опиши идею текстом.
 
-        ### Правила для генерации:
-        1.  **Твоя цель — додумать концепцию.** Проанализируй запрос пользователя и уже заполненные поля в анкете.
-        2.  **Заполни ВСЕ пустые поля.** Это включает `contract_name`, `creature_name`, `creature_rank`, `creature_spectrum`, `creature_description`, `gift`.
-        3.  **Создай НЕСКОЛЬКО способностей.** Если массив `abilities` пуст, ты **ОБЯЗАН** создать 2-3 уникальные и сбалансированные способности, которые соответствуют тематике контракта. Каждая способность должна иметь название, описание, тип ячейки, стоимость и теги.
-        4.  **Не трогай заполненное.** Если какое-то поле уже заполнено пользователем, не изменяй его.
-        5.  **Будь креативным.** Предложи интересные и неожиданные идеи, которые вписываются в мир игры.
-        6.  **Строго следуй формату JSON.** Твой ответ должен быть валидным JSON, соответствующим Pydantic-модели `Contract`.
-
-        ---
-
-        **Контекст из базы знаний (лор и общие правила):**
-        {context}
-
-        **Данные анкеты и запрос игрока:**
+        **Анкета и запрос:**
         {question}
-
-        ---
-
-        **Твоя задача:**
-        Проанализируй `question`, найди в нем объект `character_data` и внутри него `contracts`. Для первого контракта в массиве заполни все пустые поля, включая генерацию способностей, если это необходимо. Верни JSON, который соответствует Pydantic-модели `Contract`.
         """
-        self.contract_idea_prompt = ChatPromptTemplate.from_template(contract_idea_template)
+        self.creative_idea_prompt = ChatPromptTemplate.from_template(creative_idea_template)
+
+        # Промпт для форматирования в JSON (Шаг 2)
+        json_formatter_template = """
+        Ты — машина для форматирования текста в JSON.
+        Твоя задача — взять текстовое описание контракта и преобразовать его в JSON, строго соответствующий Pydantic-модели `Contract`.
+        Заполни все поля, включая `abilities`.
+
+        **Текст для форматирования:**
+        {creative_text}
+        """
+        self.json_formatter_prompt = ChatPromptTemplate.from_template(json_formatter_template)
 
     def validate_character_sheet(self, sheet_json: str) -> str:
         """
@@ -213,18 +208,26 @@ class Assistant:
 
     def generate_contract_idea(self, sheet_and_prompt: dict) -> dict:
         """
-        Генерирует идею для контракта на основе анкеты и запроса.
+        Генерирует идею для контракта в два этапа: креатив и форматирование.
         """
-        structured_llm = self.llm.with_structured_output(Contract, method="function_calling")
-        chain = (
+        # Шаг 1: Генерация креативной идеи
+        creative_chain = (
             {"context": self.retriever, "question": RunnablePassthrough()}
-            | self.contract_idea_prompt
+            | self.creative_idea_prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        sheet_str = json.dumps(sheet_and_prompt, ensure_ascii=False, indent=2)
+        creative_text = creative_chain.invoke(sheet_str)
+
+        # Шаг 2: Форматирование в JSON
+        structured_llm = self.llm.with_structured_output(Contract, method="function_calling")
+        formatting_chain = (
+            self.json_formatter_prompt
             | structured_llm
         )
-        # Переводим JSON в строку для передачи в модель
-        sheet_str = json.dumps(sheet_and_prompt, ensure_ascii=False, indent=2)
-        response = chain.invoke(sheet_str)
-        return json.loads(response.json())
+        response = formatting_chain.invoke({"creative_text": creative_text})
+        return response.dict()
 
 if __name__ == '__main__':
     # Пример использования (для демонстрации)
