@@ -43,7 +43,7 @@ class Assistant:
             model=model_id,
             openai_api_key=config.API_KEY,
             base_url=config.BASE_URL,
-            temperature=0.7  # Температура для более креативных ответов
+            temperature=0.9  # Повышенная температура для максимальной креативности
         )
 
         # Загрузка существующей векторной базы данных
