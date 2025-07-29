@@ -132,12 +132,16 @@ class Assistant:
 
         # Шаг 2: Форматирование в JSON
         formatting_chain = (
-            self.json_formatter_prompt
+            {
+                "context": self.retriever,
+                "creative_text": RunnablePassthrough()
+            }
+            | self.json_formatter_prompt
             | self.llm
             | StrOutputParser()
         )
         
-        json_response_str = formatting_chain.invoke({"creative_text": creative_text})
+        json_response_str = formatting_chain.invoke(creative_text)
         
         # Шаг 3: Безопасный парсинг JSON
         try:
