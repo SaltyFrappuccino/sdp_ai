@@ -64,6 +64,16 @@ class Assistant:
         """
         Готовит и компилирует шаблоны промптов для разных задач.
         """
+        # Загрузка новых промптов из файлов
+        with open('sdp_ai/new_creative_prompt.md', 'r', encoding='utf-8') as f:
+            creative_idea_template = f.read()
+        self.creative_idea_prompt = ChatPromptTemplate.from_template(creative_idea_template)
+
+        with open('sdp_ai/new_json_formatter_prompt.md', 'r', encoding='utf-8') as f:
+            json_formatter_template = f.read()
+        self.json_formatter_prompt = ChatPromptTemplate.from_template(json_formatter_template)
+
+        # Старые промпты (валидация и общая генерация идей) пока оставляем без изменений
         # Промпт для валидации анкеты (версия 2.0 для ГМ)
         validation_template = """
         Ты — опытный и очень внимательный к деталям Гейм-Мастер (ГМ). Твоя задача — провести глубокий анализ анкеты персонажа, уделяя особое внимание балансу сил.
@@ -158,52 +168,6 @@ class Assistant:
         Твоя сгенерированная анкета должна быть креативной, сбалансированной и полностью готовой для игры.
         """
         self.idea_prompt = ChatPromptTemplate.from_template(idea_template)
-
-        # Промпт для генерации креативной идеи (Шаг 1)
-        creative_idea_template = """
-        Ты — креативный Гейм-Мастер (ГМ). Твоя задача — придумать идею для контракта.
-        Проанализируй анкету и запрос игрока. Напиши в свободной форме описание контракта, существа и 2-3 способностей.
-        Не используй JSON. Просто опиши идею текстом.
-
-        **Анкета и запрос:**
-        {question}
-        """
-        self.creative_idea_prompt = ChatPromptTemplate.from_template(creative_idea_template)
-
-        # Промпт для форматирования в JSON (Шаг 2)
-        json_formatter_template = """
-        Ты — машина для форматирования текста в JSON.
-        Твоя задача — взять текстовое описание контракта и преобразовать его в JSON, строго соответствующий Pydantic-модели `Contract`.
-        Заполни все поля, включая `abilities`.
-        Твой ответ должен содержать **только** валидный JSON-объект и ничего больше.
-
-        **Вот требуемая структура JSON:**
-        ```json
-        {{
-          "contract_name": "Название Контракта",
-          "creature_name": "Имя/Название Существа",
-          "creature_rank": "Ранг Существа (F, E, D, C, B, A, S, SS, SSS)",
-          "creature_spectrum": "Спектр/Тематика существа",
-          "creature_description": "Описание внешности и характера существа",
-          "gift": "Дар (пассивный эффект), который получает владелец контракта",
-          "sync_level": 0,
-          "unity_stage": "Ступень I - Активация",
-          "abilities": [
-            {{
-              "name": "Название способности",
-              "cell_type": "Тип Ячейки ('Нулевая', 'Малая (I)', 'Значительная (II)', 'Предельная (III)')",
-              "cell_cost": "Стоимость способности в ячейках",
-              "description": "Описание эффекта способности",
-              "tags": {{ "Тег1": "РангТега1", "Тег2": "РангТега2" }}
-            }}
-          ]
-        }}
-        ```
-
-        **Текст для форматирования:**
-        {creative_text}
-        """
-        self.json_formatter_prompt = ChatPromptTemplate.from_template(json_formatter_template)
 
     def _extract_json(self, text: str) -> dict:
         """
