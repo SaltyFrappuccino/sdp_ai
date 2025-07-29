@@ -9,6 +9,7 @@ import uuid
 import logging
 import requests
 from pydantic import BaseModel
+import argparse
 
 app = FastAPI()
 
@@ -84,7 +85,7 @@ async def start_validation(
     db: Connection = Depends(get_db)
 ):
     # Check rate limit
-    if not data.admin_id:
+    if not no_cd and not data.admin_id:
         cursor = db.execute(
             "SELECT last_request FROM ai_requests WHERE vk_id = ?",
             (data.vk_id,)
@@ -119,5 +120,10 @@ async def get_task_status(task_id: str):
     return task
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no-cd", action="store_true", help="Disable cooldown")
+    args = parser.parse_args()
+    no_cd = args.no_cd
+
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3001)
