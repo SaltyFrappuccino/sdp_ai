@@ -54,23 +54,24 @@ class CharacterData(BaseModel):
     character_data: dict
     vk_id: int = 0
     admin_id: str = None
-    character_id: int
+    character_id: int = None
 
-def process_validation(task_id: str, character_id: int, character_data: dict):
+def process_validation(task_id: str, character_data: dict, character_id: int = None):
     logger.info(f"Starting validation for task {task_id}")
     try:
         result = assistant.validate_character_sheet(character_data)
         tasks[task_id] = {"status": "completed", "result": result}
         logger.info(f"Validation for task {task_id} completed successfully")
         
-        try:
-            requests.post(
-                f"http://localhost:3000/api/characters/{character_id}/ai-analysis",
-                json={"result": result}
-            )
-            logger.info(f"Successfully sent AI analysis for character {character_id} to backend")
-        except Exception as e:
-            logger.error(f"Failed to send AI analysis for character {character_id} to backend: {e}")
+        if character_id:
+            try:
+                requests.post(
+                    f"http://localhost:3000/api/characters/{character_id}/ai-analysis",
+                    json={"result": result}
+                )
+                logger.info(f"Successfully sent AI analysis for character {character_id} to backend")
+            except Exception as e:
+                logger.error(f"Failed to send AI analysis for character {character_id} to backend: {e}")
 
     except Exception as e:
         tasks[task_id] = {"status": "error", "detail": str(e)}
@@ -99,7 +100,7 @@ async def start_validation(
     task_id = str(uuid.uuid4())
     tasks[task_id] = {"status": "processing"}
     
-    background_tasks.add_task(process_validation, task_id, data.character_id, data.character_data)
+    background_tasks.add_task(process_validation, task_id, data.character_data, data.character_id)
     
     # Update request timestamp
     db.execute(
