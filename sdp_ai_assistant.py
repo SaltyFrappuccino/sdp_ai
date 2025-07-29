@@ -209,17 +209,11 @@ class Assistant:
         )
         return chain.invoke(user_prompt)
 
-    def generate_contract_idea(self, sheet_and_prompt: dict) -> str:
+    def generate_contract_idea(self, sheet_and_prompt: dict) -> dict:
         """
         Генерирует идею для контракта на основе анкеты и запроса.
         """
-        chain = (
-            {"context": self.retriever, "question": RunnablePassthrough()}
-            | self.contract_idea_prompt
-            | self.llm
-            | StrOutputParser()
-        )
-        structured_llm = self.llm.with_structured_output(Contract)
+        structured_llm = self.llm.with_structured_output(Contract, method="function_calling")
         chain = (
             {"context": self.retriever, "question": RunnablePassthrough()}
             | self.contract_idea_prompt
@@ -228,7 +222,7 @@ class Assistant:
         # Переводим JSON в строку для передачи в модель
         sheet_str = json.dumps(sheet_and_prompt, ensure_ascii=False, indent=2)
         response = chain.invoke(sheet_str)
-        return response.json()
+        return json.loads(response.json())
 
 if __name__ == '__main__':
     # Пример использования (для демонстрации)
