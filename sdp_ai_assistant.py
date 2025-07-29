@@ -1,4 +1,5 @@
 import json
+import re
 from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
@@ -174,11 +175,33 @@ class Assistant:
         Ты — машина для форматирования текста в JSON.
         Твоя задача — взять текстовое описание контракта и преобразовать его в JSON, строго соответствующий Pydantic-модели `Contract`.
         Заполни все поля, включая `abilities`.
+        Твой ответ должен содержать **только** валидный JSON-объект и ничего больше.
 
         **Текст для форматирования:**
         {creative_text}
         """
         self.json_formatter_prompt = ChatPromptTemplate.from_template(json_formatter_template)
+
+    def _extract_json(self, text: str) -> dict:
+        """
+        Извлекает JSON-объект из строки, очищая от мусора.
+        """
+        # Ищем JSON, который может быть обернут в ```json ... ```
+        match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            # Если обертки нет, ищем первый попавшийся объект
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+            else:
+                raise ValueError("Не удалось найти JSON в ответе модели.")
+
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Ошибка декодирования JSON: {e}\nПолученный текст: {json_str}")
 
     def validate_character_sheet(self, sheet_json: str) -> str:
         """
@@ -221,13 +244,21 @@ class Assistant:
         creative_text = creative_chain.invoke(sheet_str)
 
         # Шаг 2: Форматирование в JSON
-        structured_llm = self.llm.with_structured_output(Contract, method="function_calling")
         formatting_chain = (
             self.json_formatter_prompt
-            | structured_llm
+            | self.llm
+            | StrOutputParser()
         )
-        response = formatting_chain.invoke({"creative_text": creative_text})
-        return response.dict()
+        
+        json_response_str = formatting_chain.invoke({"creative_text": creative_text})
+        
+        # Шаг 3: Безопасный парсинг JSON
+        try:
+            # Пробуем сначала стандартный парсинг
+            return json.loads(json_response_str)
+        except json.JSONDecodeError:
+            # Если не удалось, используем наш "умный" экстрактор
+            return self._extract_json(json_response_str)
 
 if __name__ == '__main__':
     # Пример использования (для демонстрации)
