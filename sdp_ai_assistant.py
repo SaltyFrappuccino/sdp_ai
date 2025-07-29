@@ -5,8 +5,28 @@ from langchain_openai import OpenAIEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from langchain_core.pydantic_v1 import BaseModel, Field
+from typing import List, Dict
 
 import config
+
+class Ability(BaseModel):
+    name: str = Field(description="Название способности")
+    cell_type: str = Field(description="Тип Ячейки ('Нулевая', 'Малая (I)', 'Значительная (II)', 'Предельная (III)')")
+    cell_cost: int = Field(description="Стоимость способности в ячейках")
+    description: str = Field(description="Описание эффекта способности")
+    tags: Dict[str, str] = Field(description="Теги способности и их ранги")
+
+class Contract(BaseModel):
+    contract_name: str = Field(description="Название Контракта")
+    creature_name: str = Field(description="Имя/Название Существа")
+    creature_rank: str = Field(description="Ранг Существа (F, E, D, C, B, A, S, SS, SSS)")
+    creature_spectrum: str = Field(description="Спектр/Тематика существа")
+    creature_description: str = Field(description="Описание внешности и характера существа")
+    gift: str = Field(description="Дар (пассивный эффект), который получает владелец контракта")
+    sync_level: int = Field(description="Уровень Синхронизации (от 0 до 100)", default=0)
+    unity_stage: str = Field(description="Ступень Единения", default="Ступень I - Активация")
+    abilities: List[Ability] = Field(description="Список способностей контракта")
 
 class Assistant:
     """
@@ -138,6 +158,31 @@ class Assistant:
         """
         self.idea_prompt = ChatPromptTemplate.from_template(idea_template)
 
+        contract_idea_template = """
+        Ты — креативный Гейм-Мастер (ГМ), специализирующийся на создании уникальных контрактов и способностей.
+        Твоя задача — помочь игроку, додумав за него концепцию контракта на основе его запроса и уже заполненных данных.
+
+        ### Правила для генерации:
+        1.  **Не изменяй существующее:** Если поле в контракте уже заполнено (например, `contract_name`), не меняй его. Твоя цель — заполнить только пустые или частично заполненные поля.
+        2.  **Генерируй способности:** Если массив `abilities` пуст, ты **обязан** сгенерировать 2-3 сбалансированные способности, которые подходят под общую концепцию.
+        3.  **Анализируй контекст:** Внимательно изучи анкету персонажа (ранг, архетипы, фракция) и запрос игрока, чтобы твои идеи были логичными и уместными.
+        4.  **Следуй структуре:** Твой ответ должен быть строго в формате JSON, соответствующем предоставленной схеме.
+
+        ---
+
+        **Контекст из базы знаний (лор и общие правила):**
+        {context}
+
+        **Данные анкеты и запрос игрока:**
+        {question}
+
+        ---
+
+        **Твоя задача:**
+        Проанализируй `question`, найди в нем объект `character_data` и внутри него `contracts`. Для первого контракта в массиве заполни все пустые поля, включая генерацию способностей, если это необходимо. Верни JSON, который соответствует Pydantic-модели `Contract`.
+        """
+        self.contract_idea_prompt = ChatPromptTemplate.from_template(contract_idea_template)
+
     def validate_character_sheet(self, sheet_json: str) -> str:
         """
         Проверяет анкету персонажа на соответствие правилам.
@@ -163,6 +208,27 @@ class Assistant:
             | StrOutputParser()
         )
         return chain.invoke(user_prompt)
+
+    def generate_contract_idea(self, sheet_and_prompt: dict) -> str:
+        """
+        Генерирует идею для контракта на основе анкеты и запроса.
+        """
+        chain = (
+            {"context": self.retriever, "question": RunnablePassthrough()}
+            | self.contract_idea_prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        structured_llm = self.llm.with_structured_output(Contract)
+        chain = (
+            {"context": self.retriever, "question": RunnablePassthrough()}
+            | self.contract_idea_prompt
+            | structured_llm
+        )
+        # Переводим JSON в строку для передачи в модель
+        sheet_str = json.dumps(sheet_and_prompt, ensure_ascii=False, indent=2)
+        response = chain.invoke(sheet_str)
+        return response.json()
 
 if __name__ == '__main__':
     # Пример использования (для демонстрации)

@@ -57,6 +57,10 @@ class CharacterData(BaseModel):
     admin_id: str | None = None
     character_id: int | None = None
 
+class ContractIdeaData(BaseModel):
+    character_data: dict
+    user_prompt: str
+
 def process_validation(task_id: str, character_data: dict, character_id: int = None):
     logger.info(f"Starting validation for task {task_id}")
     try:
@@ -77,6 +81,19 @@ def process_validation(task_id: str, character_data: dict, character_id: int = N
     except Exception as e:
         tasks[task_id] = {"status": "error", "detail": str(e)}
         logger.error(f"Validation for task {task_id} failed: {e}")
+
+def process_contract_generation(task_id: str, character_data: dict, user_prompt: str):
+    logger.info(f"Starting contract generation for task {task_id}")
+    try:
+        result = assistant.generate_contract_idea({
+            "character_data": character_data,
+            "user_prompt": user_prompt
+        })
+        tasks[task_id] = {"status": "completed", "result": result}
+        logger.info(f"Contract generation for task {task_id} completed successfully")
+    except Exception as e:
+        tasks[task_id] = {"status": "error", "detail": str(e)}
+        logger.error(f"Contract generation for task {task_id} failed: {e}")
 
 @app.post("/validate")
 async def start_validation(
@@ -118,6 +135,18 @@ async def get_task_status(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+@app.post("/generate-contract")
+async def start_contract_generation(
+    data: ContractIdeaData,
+    background_tasks: BackgroundTasks
+):
+    task_id = str(uuid.uuid4())
+    tasks[task_id] = {"status": "processing"}
+    
+    background_tasks.add_task(process_contract_generation, task_id, data.character_data, data.user_prompt)
+    
+    return {"task_id": task_id}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
