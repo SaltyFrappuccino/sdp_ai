@@ -48,8 +48,7 @@ def get_db():
         conn.close()
 
 # Initialize AI assistant
-assistant = Assistant(config.MODEL_LIST[1])  # Используем gemini-2.5-flash
-
+assistant = Assistant(config.MODEL_LIST[0])  
 tasks = {}
 
 class CharacterData(BaseModel):
