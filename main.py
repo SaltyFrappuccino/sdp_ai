@@ -53,8 +53,8 @@ tasks = {}
 class CharacterData(BaseModel):
     character_data: dict
     vk_id: int = 0
-    admin_id: str = None
-    character_id: int = None
+    admin_id: str | None = None
+    character_id: int | None = None
 
 def process_validation(task_id: str, character_data: dict, character_id: int = None):
     logger.info(f"Starting validation for task {task_id}")
