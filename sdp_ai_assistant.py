@@ -64,14 +64,10 @@ class Assistant:
         """
         Готовит и компилирует шаблоны промптов для разных задач.
         """
-        # Загрузка новых промптов из файлов
-        with open('sdp_ai/new_creative_prompt.md', 'r', encoding='utf-8') as f:
-            creative_idea_template = f.read()
-        self.creative_idea_prompt = ChatPromptTemplate.from_template(creative_idea_template)
-
-        with open('sdp_ai/new_json_formatter_prompt.md', 'r', encoding='utf-8') as f:
-            json_formatter_template = f.read()
-        self.json_formatter_prompt = ChatPromptTemplate.from_template(json_formatter_template)
+        # Загрузка единого промпта
+        with open('sdp_ai/ultimate_prompt.md', 'r', encoding='utf-8') as f:
+            ultimate_template = f.read()
+        self.ultimate_prompt = ChatPromptTemplate.from_template(ultimate_template)
 
         # Старые промпты (валидация и общая генерация идей) пока оставляем без изменений
         # Промпт для валидации анкеты (версия 2.0 для ГМ)
@@ -218,33 +214,22 @@ class Assistant:
 
     def generate_contract_idea(self, sheet_and_prompt: dict) -> dict:
         """
-        Генерирует идею для контракта в два этапа: креатив и форматирование.
+        Генерирует идею для контракта в один этап с использованием единого промпта.
         """
-        # Шаг 1: Генерация креативной идеи
-        creative_chain = (
+        chain = (
             {"context": self.retriever, "question": RunnablePassthrough()}
-            | self.creative_idea_prompt
+            | self.ultimate_prompt
             | self.llm
             | StrOutputParser()
         )
+        
         sheet_str = json.dumps(sheet_and_prompt, ensure_ascii=False, indent=2)
-        creative_text = creative_chain.invoke(sheet_str)
-
-        # Шаг 2: Форматирование в JSON
-        formatting_chain = (
-            self.json_formatter_prompt
-            | self.llm
-            | StrOutputParser()
-        )
+        json_response_str = chain.invoke(sheet_str)
         
-        json_response_str = formatting_chain.invoke({"creative_text": creative_text})
-        
-        # Шаг 3: Безопасный парсинг JSON
+        # Безопасный парсинг JSON
         try:
-            # Пробуем сначала стандартный парсинг
             return json.loads(json_response_str)
         except json.JSONDecodeError:
-            # Если не удалось, используем наш "умный" экстрактор
             return self._extract_json(json_response_str)
 
 if __name__ == '__main__':
