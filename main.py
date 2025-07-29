@@ -90,7 +90,7 @@ def process_contract_generation(task_id: str, character_data: dict, user_prompt:
             "character_data": character_data,
             "user_prompt": user_prompt
         })
-        tasks[task_id] = {"status": "completed", "result": json.dumps(result)}
+        tasks[task_id] = {"status": "completed", "result": result}
         logger.info(f"Contract generation for task {task_id} completed successfully")
     except Exception as e:
         tasks[task_id] = {"status": "error", "detail": str(e)}
