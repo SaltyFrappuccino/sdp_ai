@@ -1,18 +1,9 @@
-# config.py
-
-# URL для OpenAI-совместимого API
 BASE_URL = "https://api.aitunnel.ru/v1/"
-
-# Ключ API
 API_KEY = "sk-aitunnel-6nSOCdFD2jUgDD3fzNwfJtqFbtQl8BaL"
-
-# Список моделей для тестирования
 MODEL_LIST = [
     "deepseek-r1",
     "gemini-2.5-flash-lite",
 ]
-
-# Prompts
 
 VALIDATION_PROMPT = """
 Ты — опытный и очень внимательный к деталям Гейм-Мастер (ГМ). Твоя задача — провести глубокий анализ анкеты персонажа, уделяя особое внимание балансу сил.
